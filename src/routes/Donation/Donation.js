@@ -1,7 +1,7 @@
 import React from "react";
 import Block from "dxc-flex";
 import wx from "./wx.jpeg";
-import zfb from "./zfb.jpg";
+
 import DonationItem from "./DonationItem";
 
 export default class Donation extends React.Component {
@@ -13,7 +13,6 @@ export default class Donation extends React.Component {
         </Block>
         <Block>
           <DonationItem name="微信" qr={wx} />
-          <DonationItem name="支付宝" qr={zfb} />
         </Block>
       </Block>
     );
