@@ -37,9 +37,9 @@ var Canvas2Image = (function() {
     return canvas.toDataURL(type);
   }
 
-  function saveFile(strData) {
+  function saveFile(strData, fileName) {
     var aLink = document.createElement("a");
-    aLink.download = "watermark.jpg";
+    aLink.download = fileName || "watermark.jpg";
     aLink.href = strData;
     aLink.click();
   }
@@ -51,7 +51,7 @@ var Canvas2Image = (function() {
   }
   function fixType(type) {
     type = type.toLowerCase().replace(/jpg/i, "jpeg");
-    var r = type.match(/png|jpeg|bmp|gif/)[0];
+    var r = type.match(/png|jpeg|bmp|gif|webp/)[0];
     return "image/" + r;
   }
   function encodeData(data) {
@@ -126,19 +126,20 @@ var Canvas2Image = (function() {
 
     //
     //  typedef struct tagBITMAPINFOHEADER {
-    //  	DWORD biSize;
-    //  	LONG  biWidth;
-    //  	LONG  biHeight;
-    //  	WORD  biPlanes;
-    //  	WORD  biBitCount;
-    //  	DWORD biCompression;
-    //  	DWORD biSizeImage;
-    //  	LONG  biXPelsPerMeter;
-    //  	LONG  biYPelsPerMeter;
-    //  	DWORD biClrUsed;
-    //  	DWORD biClrImportant;
+    //      DWORD biSize;
+    //      LONG  biWidth;
+    //      LONG  biHeight;
+    //      WORD  biPlanes;
+    //      WORD  biBitCount;
+    //      DWORD biCompression;
+    //      DWORD biSizeImage;
+    //      LONG  biXPelsPerMeter;
+    //      LONG  biYPelsPerMeter;
+    //      DWORD biClrUsed;
+    //      DWORD biClrImportant;
     //  } BITMAPINFOHEADER, *PBITMAPINFOHEADER;
     //
+
     var BITMAPINFOHEADER = [
       // DWORD biSize -- The number of bytes required by the structure
       40,
@@ -155,19 +156,18 @@ var Canvas2Image = (function() {
       (biHeight >> 8) & 0xff,
       (biHeight >> 16) & 0xff,
       (biHeight >> 24) & 0xff,
-      // WORD biPlanes -- The number of planes for the target device. This value must be set to 1
+      // WORD biPlanes -- The number of planes for the target device. This value must be set to 1.
       1,
       0,
-      // WORD biBitCount -- The number of bits-per-pixel, 24 bits-per-pixel -- the bitmap
-      // has a maximum of 2^24 colors (16777216, Truecolor)
+      // WORD biBitCount -- The number of bits-per-pixel. 24 bits-per-pixel = 3 byte (defined as BI_RGB, uncompressed)
       24,
       0,
-      // DWORD biCompression -- The type of compression, BI_RGB (code 0) -- uncompressed
+      // DWORD biCompression -- The type of compression, usually set to BI_RGB (no compression)
       0,
       0,
       0,
       0,
-      // DWORD biSizeImage -- The size, in bytes, of the image. This may be set to zero for BI_RGB bitmaps
+      // DWORD biSizeImage -- The size, in bytes, of the image. This may be set to zero for BI_RGB bitmaps.
       biSizeImage & 0xff,
       (biSizeImage >> 8) & 0xff,
       (biSizeImage >> 16) & 0xff,
@@ -194,24 +194,22 @@ var Canvas2Image = (function() {
       0
     ];
 
-    var iPadding = (4 - (biWidth * 3) % 4) % 4;
-
+    var iPadding = (4 - ((biWidth * 3) % 4)) % 4;
     var aImgData = oData.data;
 
     var strPixelData = "";
     var biWidth4 = biWidth << 2;
     var y = biHeight;
-    var fromCharCode = String.fromCharCode;
-
     do {
       var iOffsetY = biWidth4 * (y - 1);
       var strPixelRow = "";
       for (var x = 0; x < biWidth; x++) {
         var iOffsetX = x << 2;
-        strPixelRow +=
-          fromCharCode(aImgData[iOffsetY + iOffsetX + 2]) +
-          fromCharCode(aImgData[iOffsetY + iOffsetX + 1]) +
-          fromCharCode(aImgData[iOffsetY + iOffsetX]);
+        strPixelRow += String.fromCharCode(
+          aImgData[iOffsetY + iOffsetX + 2],
+          aImgData[iOffsetY + iOffsetX + 1],
+          aImgData[iOffsetY + iOffsetX]
+        );
       }
 
       for (var c = 0; c < iPadding; c++) {
@@ -221,8 +219,7 @@ var Canvas2Image = (function() {
       strPixelData += strPixelRow;
     } while (--y);
 
-    var strEncoded =
-      encodeData(BITMAPFILEHEADER.concat(BITMAPINFOHEADER)) + encodeData(strPixelData);
+    var strEncoded = encodeData(BITMAPFILEHEADER.concat(BITMAPINFOHEADER)) + encodeData(strPixelData);
 
     return strEncoded;
   };
@@ -230,80 +227,107 @@ var Canvas2Image = (function() {
   /**
    * saveAsImage
    * @param canvasElement
-   * @param {String} image type
+   * @param {String}image type
    * @param {Number} [optional] png width
    * @param {Number} [optional] png height
    */
-  var saveAsImage = function(canvas, width, height, type) {
+  var saveAsImage = function(canvas, width, height, type, fileName) {
     if ($support.canvas && $support.dataURL) {
-      if (typeof canvas === "string") {
-        canvas = document.getElementById(canvas);
+      if (typeof width == "string") {
+        type = width;
+        width = undefined;
       }
-      if (type == undefined) {
-        type = "png";
+      if (typeof height == "string") {
+        type = height;
+        height = undefined;
       }
-      type = fixType(type);
-      if (/bmp/.test(type)) {
+      type = type || "png";
+
+      var strData;
+
+      if (type == "bmp") {
         var data = getImageData(scaleCanvas(canvas, width, height));
-        var strData = genBitmapImage(data);
-        saveFile(makeURI(strData, downloadMime));
+        strData = makeURI(genBitmapImage(data), "image/bmp");
       } else {
-        var strData = getDataURL(canvas, type, width, height);
-        // saveFile(strData.replace(type, downloadMime));
-        saveFile(strData);
+        strData = getDataURL(canvas, type, width, height);
       }
+      saveFile(strData.replace(type, downloadMime), fileName);
     }
   };
 
-  var convertToImage = function(canvas, width, height, type) {
+  var readAsImage = function(canvas, width, height, type) {
     if ($support.canvas && $support.dataURL) {
-      if (typeof canvas === "string") {
-        canvas = document.getElementById(canvas);
+      if (typeof width == "string") {
+        type = width;
+        width = undefined;
       }
-      if (type == undefined) {
-        type = "png";
+      if (typeof height == "string") {
+        type = height;
+        height = undefined;
       }
-      type = fixType(type);
+      type = type || "png";
 
-      if (/bmp/.test(type)) {
+      var strData;
+
+      if (type == "bmp") {
         var data = getImageData(scaleCanvas(canvas, width, height));
-        var strData = genBitmapImage(data);
-        return genImage(makeURI(strData, "image/bmp"));
+        strData = makeURI(genBitmapImage(data), "image/bmp");
       } else {
-        var strData = getDataURL(canvas, type, width, height);
-        return genImage(strData);
+        strData = getDataURL(canvas, type, width, height);
       }
+      return genImage(strData);
     }
+  };
+
+  var saveAsPNG = function(canvas, width, height) {
+    return saveAsImage(canvas, width, height, "png", "watermark.png");
+  };
+
+  var saveAsJPEG = function(canvas, width, height) {
+    return saveAsImage(canvas, width, height, "jpeg", "watermark.jpg");
+  };
+
+  var saveAsGIF = function(canvas, width, height) {
+    return saveAsImage(canvas, width, height, "gif", "watermark.gif");
+  };
+
+  var saveAsBMP = function(canvas, width, height) {
+    return saveAsImage(canvas, width, height, "bmp", "watermark.bmp");
+  };
+
+  var saveAsWEBP = function(canvas, width, height) {
+    return saveAsImage(canvas, width, height, "webp", "watermark.webp");
+  };
+
+  var convertToPNG = function(canvas, width, height) {
+    return readAsImage(canvas, width, height, "png");
+  };
+
+  var convertToJPEG = function(canvas, width, height) {
+    return readAsImage(canvas, width, height, "jpeg");
+  };
+
+  var convertToGIF = function(canvas, width, height) {
+    return readAsImage(canvas, width, height, "gif");
+  };
+
+  var convertToBMP = function(canvas, width, height) {
+    return readAsImage(canvas, width, height, "bmp");
   };
 
   return {
     saveAsImage: saveAsImage,
-    saveAsPNG: function(canvas, width, height) {
-      return saveAsImage(canvas, width, height, "png");
-    },
-    saveAsJPEG: function(canvas, width, height) {
-      return saveAsImage(canvas, width, height, "jpeg");
-    },
-    saveAsGIF: function(canvas, width, height) {
-      return saveAsImage(canvas, width, height, "gif");
-    },
-    saveAsBMP: function(canvas, width, height) {
-      return saveAsImage(canvas, width, height, "bmp");
-    },
+    saveAsPNG: saveAsPNG,
+    saveAsJPEG: saveAsJPEG,
+    saveAsGIF: saveAsGIF,
+    saveAsBMP: saveAsBMP,
+    saveAsWEBP: saveAsWEBP,
 
-    convertToImage: convertToImage,
-    convertToPNG: function(canvas, width, height) {
-      return convertToImage(canvas, width, height, "png");
-    },
-    convertToJPEG: function(canvas, width, height) {
-      return convertToImage(canvas, width, height, "jpeg");
-    },
-    convertToGIF: function(canvas, width, height) {
-      return convertToImage(canvas, width, height, "gif");
-    },
-    convertToBMP: function(canvas, width, height) {
-      return convertToImage(canvas, width, height, "bmp");
-    }
+    convertToImage: readAsImage,
+    convertToPNG: convertToPNG,
+    convertToJPEG: convertToJPEG,
+    convertToGIF: convertToGIF,
+    convertToBMP: convertToBMP
   };
 })();
 

@@ -9,6 +9,18 @@ import Alpha from "./Alpha";
 import example from "./example.jpg";
 import styles from "./Main.css";
 
+const getImageTypeFromDataURL = dataURL => {
+  const result = /^data:image\/(\w+);base64,/i.exec(dataURL || "");
+  if (!result || !result[1]) {
+    return "jpeg";
+  }
+  const type = result[1].toLowerCase();
+  if (type === "jpg") {
+    return "jpeg";
+  }
+  return type;
+};
+
 export default class Main extends React.Component {
   state = {
     isExist: true,
@@ -22,11 +34,13 @@ export default class Main extends React.Component {
   componentDidMount() {
     this.watermark = new Watermark(this.mainCanvas);
     this.setOptions();
-    this.watermark.draw(example);
+    this.watermark.draw(example, "jpeg");
   }
   onChangeFile = files => {
     filesToDataURL(files).then(dataUrls => {
-      this.watermark.draw(dataUrls[0]);
+      const dataURL = dataUrls[0];
+      const type = getImageTypeFromDataURL(dataURL);
+      this.watermark.draw(dataURL, type);
       this.setState({ isExist: true });
     });
   };
@@ -65,7 +79,7 @@ export default class Main extends React.Component {
       <Block horizontal="center">
         <div style={{ width: 345 }}>
           <Block>
-            <Upload onChange={this.onChangeFile}>
+            <Upload onChange={this.onChangeFile} accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
               <Button>选择文件</Button>
             </Upload>
             {isExist ? <Button onClick={this.rotate}>旋转</Button> : null}

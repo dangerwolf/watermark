@@ -28,6 +28,7 @@ function Watermark(canvas, opt = {}) {
   // document.getElementById("test").appendChild(cw);
   let img_width, img_height;
   let userOptions = opt;
+  let outputType = "jpeg";
   const getOptions = () => {
     const defaultOptions = {
       text: "仅用于办理XXXX，他用无效。",
@@ -110,13 +111,14 @@ function Watermark(canvas, opt = {}) {
     }
   };
   const addWatermark = () => {
-    //平铺--重复小块的canvas
+    //平铺--重复���块的canvas
     var pat = ctx.createPattern(cw, "repeat");
     ctx.fillStyle = pat;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   };
-  this.draw = dataURL => {
+  this.draw = (dataURL, type = "jpeg") => {
     step = 0;
+    outputType = type;
     img = new Image();
     img.onload = () => {
       img_width = img.width;
@@ -140,6 +142,14 @@ function Watermark(canvas, opt = {}) {
   };
   this.save = () => {
     if (!img) {
+      return;
+    }
+    if (outputType === "png") {
+      Canvas2Image.saveAsPNG(canvas);
+      return;
+    }
+    if (outputType === "webp") {
+      Canvas2Image.saveAsWEBP(canvas);
       return;
     }
     Canvas2Image.saveAsJPEG(canvas);
